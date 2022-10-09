@@ -27,17 +27,17 @@ public class MySkeleton extends Skeleton {
     }
 
     @Override
-    public void performRangedAttack(LivingEntity target, float p_32142_) {
+    public void performRangedAttack(LivingEntity p_32141_, float p_32142_) {
         ItemStack itemstack = this.getProjectile(this.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this, item -> item instanceof net.minecraft.world.item.BowItem)));
         AbstractArrow abstractarrow = this.getArrow(itemstack, p_32142_);
         if (this.getMainHandItem().getItem() instanceof net.minecraft.world.item.BowItem)
             abstractarrow = ((net.minecraft.world.item.BowItem)this.getMainHandItem().getItem()).customArrow(abstractarrow);
-        double d0 = target.getX() - this.getX();
-        double d1 = target.getY(0.3333333333333333D) - abstractarrow.getY();
-        double d2 = target.getZ() - this.getZ();
+        double d0 = p_32141_.getX() - this.getX();
+        double d1 = p_32141_.getY(0.3333333333333333D) - abstractarrow.getY();
+        double d2 = p_32141_.getZ() - this.getZ();
         double d3 = Math.sqrt(d0 * d0 + d2 * d2);
         //abstractarrow.shoot(0, 1, 0, 1.6F, (float)(14 - this.level.getDifficulty().getId() * 4));
-        Vec3 v = calculateShot(target, abstractarrow);
+        Vec3 v = calculateShot(p_32141_, abstractarrow);
         final float ARROW_SPEED = 1.6F;
         final float DISPERSION = 0;
         abstractarrow.shoot(v.x, v.y, v.z, ARROW_SPEED, DISPERSION);
@@ -54,15 +54,16 @@ public class MySkeleton extends Skeleton {
         ExampleMod.LOGGER.info("got movement:");
         ExampleMod.LOGGER.info(String.valueOf(CommonMCEvents.playerPosValid));
         ExampleMod.LOGGER.info(vp.toString());
-        Vec3 p0 = enemy.getEyePosition();
+        Vec3 p0 = enemy.getEyePosition().subtract(new Vec3(0,0.33,0));
         Vec3 a0 = arrow.position();
 
-        double speed = 1.6;
+        double speed = 1.6F;
+        double speedSqr = speed * speed;
         double a = 0.25d * g.lengthSqr();
-        double b = 2 * vp.dot(g) - 0.5 * g.lengthSqr();
-        double c = vp.lengthSqr() + p0.dot(g) - a0.dot(g) - speed - vp.dot(g) - vp.dot(g) + 0.25d * g.lengthSqr(); //TODO I think it's 1.6F cuz velocity, not 1F
-        double d = 2*vp.dot(p0) - 2*vp.dot(a0) + 2*speed - 2*vp.lengthSqr() - p0.dot(g) + a0.dot(g) + g.dot(vp);
-        double e = p0.lengthSqr() + a0.lengthSqr() - 2*p0.dot(a0) - speed - 2*p0.dot(vp) + 2*a0.dot(vp) + vp.lengthSqr();
+        double b = 2 * vp.dot(g) + 0.5d * g.lengthSqr();
+        double c = vp.lengthSqr() + p0.dot(g) - a0.dot(g) - speedSqr + g.dot(vp) + 0.25d*g.lengthSqr(); //TODO I think it's 1.6F cuz velocity, not 1F
+        double d = 2*vp.dot(p0) - 2*vp.dot(a0) + g.dot(p0) - g.dot(a0);
+        double e = p0.lengthSqr() + a0.lengthSqr() - 2*p0.dot(a0);
         double[] ap = {Math.pow(a, 2), Math.pow(a, 3), Math.pow(a, 4)};
         double[] bp = {Math.pow(b, 2), Math.pow(b, 3), Math.pow(b, 4)};
         double[] cp = {Math.pow(c, 2), Math.pow(c, 3), Math.pow(c, 4)};
