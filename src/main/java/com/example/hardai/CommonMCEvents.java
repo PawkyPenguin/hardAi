@@ -43,9 +43,9 @@ public class CommonMCEvents {
 
     @SubscribeEvent
     public static void listenMovement(TickEvent.PlayerTickEvent p) {
-        ExampleMod.LOGGER.info("Player");
-        ExampleMod.LOGGER.info(p.phase.toString());
-        ExampleMod.LOGGER.info(p.player.position().toString());
+        //ExampleMod.LOGGER.info("Player");
+        //ExampleMod.LOGGER.info(p.phase.toString());
+        //ExampleMod.LOGGER.info(p.player.position().toString());
         if (p.phase == TickEvent.Phase.START) {
             playerPosBefore = p.player.position();
             playerPosValid = false;
