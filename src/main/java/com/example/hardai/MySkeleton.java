@@ -25,9 +25,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 public class MySkeleton extends Skeleton {
-    private static final double RANGE = 32d;
+    private static final double RANGE = 100d;
     private final MyRangedAttackGoal<MySkeleton> bowGoal = makeBowGoal();
     private final MeleeAttackGoal meleeGoal = makeMeleeGoal();
 
@@ -62,8 +63,8 @@ public class MySkeleton extends Skeleton {
         AbstractArrow abstractarrow = this.getArrow(itemstack, p_32142_);
         if (this.getMainHandItem().getItem() instanceof net.minecraft.world.item.BowItem)
             abstractarrow = ((net.minecraft.world.item.BowItem)this.getMainHandItem().getItem()).customArrow(abstractarrow);
-        final float ARROW_SPEED = 1.6F;
-        Vec3 v = calculateShot(target, abstractarrow, ARROW_SPEED);
+        final float ARROW_SPEED = 1.6f;
+        Vec3 v = calculateShotWithDrag(target, abstractarrow, ARROW_SPEED);
         final float DISPERSION = 0;
         abstractarrow.shoot(v.x, v.y, v.z, ARROW_SPEED, DISPERSION);
         this.playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.getRandom().nextFloat() * 0.4F + 0.8F));
@@ -106,6 +107,98 @@ public class MySkeleton extends Skeleton {
             }
 
         }
+    }
+
+    private Vec3 calculateShotWithDrag(LivingEntity enemy, AbstractArrow arrow, double speed) {
+        boolean hasGravity = !enemy.isOnGround() && !enemy.isNoGravity();
+        Vec3 g_player = hasGravity ? new Vec3(0, -0.05, 0) : Vec3.ZERO;
+        //g_player = Vec3.ZERO;
+        Vec3 g = new Vec3(0, -0.05, 0);
+        Vec3 vp = CommonMCEvents.playerPosAfter.subtract(CommonMCEvents.playerPosBefore);
+        ExampleMod.LOGGER.info("good movement?: " + CommonMCEvents.playerPosValid + ", got movement: " + vp);
+        Vec3 p0 = enemy.getPosition(0).add(new Vec3(0,0.5,0));
+        Vec3 a0 = arrow.position();
+        ExampleMod.LOGGER.info("Distance to target: " + (p0.subtract(a0)).length());
+        final double FRICTION = 0.99;
+        final double d = FRICTION;
+        final double D = Math.pow((d - 1), 2);
+        Vec3 c = p0.subtract(a0).add(g.scale(1/D));
+        Vec3 b = vp.add(g_player.scale(-0.5)).add(g.scale(d / D)).subtract(g.scale(1/D));
+        final double s = speed * speed;
+
+        double t = newtonMethod(500, g, g_player, c, D, b, s, d);
+        if (t < 0) {
+            /* The skeleton can't not shoot at this point. The arrow entity is already created.
+             * Would have to refactor if I wanna hold the shot. For now, try anyway with very large time,
+             * in hope of hitting anyway.
+             * TODO: Figure out mathematical max time for player coordinates and set it to that.
+             */
+            t = 100;
+        }
+        Vec3 va = (p0.subtract(a0).add(vp.scale(t)).add(g_player.scale(t*t/2 - t/2)).subtract(g.scale((Math.pow(d, t) - d*t  + t - 1)/D))).scale((d-1)/(Math.pow(d, t) - 1));
+        return va;
+    }
+
+    private double newtonMethod(double t0, Vec3 g, Vec3 gp, Vec3 c, double D, Vec3 b, double s, double d) {
+        double p2 = g.lengthSqr() / D - s;
+        double p1 = 2*s - 2*g.dot(c);
+        double p11 = -2*g.dot(b);
+        double p21 = -gp.dot(g);
+        double z = D * gp.lengthSqr() / 4;
+        double y = D * gp.dot(b);
+        double x = D * gp.dot(c) + D * b.lengthSqr();
+        double w = 2 * D * b.dot(c);
+        double v = D * c.lengthSqr() - s;
+        ExampleMod.LOGGER.info("Vars: p2 = " + p2 + ",  p1 = " + p1 + ",  p11 = " + p11+ ", p21 = " + p21+ ", z = " + z + ", y = " + y + ", x = " + x + ", w = " + w + ", v = " + v + ", d = " + d);
+
+        double slowerSolution = findZero(t0, p2, p1, p11, p21, z, y, x, w, v, d, Optional.empty());
+        Optional firstSolution = Optional.of(slowerSolution-0.001);
+        double fasterSolution = findZero(slowerSolution-0.1, p2, p1, p11, p21, z, y, x, w, v, d, firstSolution);
+        if (fasterSolution > 0 && !Double.isNaN(fasterSolution)) {
+            return fasterSolution;
+        } else {
+            return slowerSolution;
+        }
+    }
+
+    private double findZero(double t0, double p2, double p1, double p11, double p21, double z, double y, double x, double w, double v, double d, Optional<Double> firstSolution) {
+        double t = t0;
+        double ft = eval(t, p2, p1, p11, p21, z, y, x, w, v, d, firstSolution); //f(t)
+        double ft_; //f(t)'
+        int i = 0;
+        while (Math.abs(ft) > 10e-10) {
+            ft_ = evalDerivative(t, p2, p1, p11, p21, z, y, x, w, d);
+            if (firstSolution.isPresent()) {
+                ft_ = (ft_ * (t - firstSolution.get())) / Math.pow(t - firstSolution.get(), 2) - ft / (t - firstSolution.get());
+            }
+            t = t - ft / ft_;
+            ExampleMod.LOGGER.info("Iteration " + i + ", t = " + t + ", eval " + ft + ", derivative = " + ft_);
+            ft = eval(t, p2, p1, p11, p21, z, y, x, w, v, d, firstSolution);
+            i++;
+            if (i > 1000) {
+                break;
+            }
+        }
+        return t;
+    }
+
+    private double eval(double t, double p2, double p1, double p11, double p21, double z, double y, double x, double w, double v, double d, Optional<Double> firstSolution) {
+        double dPowT = Math.pow(d, t);
+        double result = Math.pow(d, 2*t) * p2 + dPowT * p1 + t*dPowT*p11 + t*t*dPowT*p21 + Math.pow(t, 4)*z
+            + Math.pow(t, 3)*y + Math.pow(t, 2)*x + t*w + v;
+        ExampleMod.LOGGER.info("info eval: z-term = :" + Math.pow(t, 4)*z);
+        if (firstSolution.isPresent()) {
+            result = result / (t - firstSolution.get());
+        }
+        return result;
+    }
+
+    private double evalDerivative(double t, double p2, double p1, double p11, double p21, double z, double y, double x, double w, double d) {
+        double dPowT = Math.pow(d, t);
+        //double result = 2*Math.pow(d, 2*t) * p2 + dPowT * p1 + t*dPowT*p11 + dPowT*p11 + Math.pow(t, 2)*dPowT*p21 + 2*t*dPowT*p21 + 4*Math.pow(t, 3) * z
+        double result = Math.log(d) * (2*Math.pow(d, 2*t)*p2 + dPowT*p1 + t*dPowT*p11 + Math.pow(t, 2)*dPowT*p21) + dPowT*p11 + 2*t*dPowT*p21 + 4*Math.pow(t, 3)*z
+                + 3*Math.pow(t, 2)*y + 2*t*x + w;
+        return result;
     }
 
     private Vec3 calculateShot(LivingEntity enemy, AbstractArrow arrow, double speed) {
