@@ -7,14 +7,31 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingSpawnEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Mod.EventBusSubscriber(modid = ExampleMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CommonMCEvents {
@@ -53,6 +70,71 @@ public class CommonMCEvents {
             playerPosAfter = p.player.position();
             playerPosValid = true;
 
+        }
+    }
+
+    public static class CachedBlockEntity {
+        BlockEntity wrapper;
+        private boolean isValid = true;
+
+        CachedBlockEntity(BlockEntity toCache) {
+            wrapper = toCache;
+        }
+
+        public boolean isValid() {
+            return isValid;
+        }
+
+        public void invalidate() {
+            isValid = false;
+        }
+    }
+
+    public static class MutableBool extends AtomicBoolean {
+        public MutableBool(boolean initialValue) {
+            super(initialValue);
+        }
+    }
+
+    //public static List<CachedBlockEntity> chests = Collections.synchronizedList(new ArrayList());
+    public static final ConcurrentHashMap<BlockEntity, MutableBool> chests = new ConcurrentHashMap();
+    @SubscribeEvent
+    public static void listenChunkLoad(ChunkEvent.Load ev) {
+        ExampleMod.LOGGER.info("Loaded chunk");
+        var allEntities = ev.getChunk().getBlockEntitiesPos();
+        var allChests = allEntities.stream().flatMap(pos -> ev.getLevel().getBlockEntity(pos, BlockEntityType.CHEST).stream());
+        for (var c : allChests.toList()) {
+            chests.put(c, new MutableBool(true));
+        }
+        ExampleMod.LOGGER.info("Done reading chests in chunk");
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void listenBlockPlace(BlockEvent.EntityPlaceEvent ev) {
+        ExampleMod.LOGGER.info("Placed block");
+        if (ev.isCanceled()) {
+            return;
+        }
+        if (ev.getPlacedBlock().getBlock() == Blocks.CHEST) {
+            BlockEntity chest = ev.getLevel().getBlockEntity(ev.getPos());
+            ExampleMod.LOGGER.info("Placed chest: " + chest);
+            chests.put(chest, new MutableBool(true));
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void listenBlockRemove(BlockEvent.BreakEvent ev) {
+        ExampleMod.LOGGER.info("Placed block");
+        if (ev.isCanceled()) {
+            return;
+        }
+        if (ev.getState().getBlock() == Blocks.CHEST) {
+            BlockEntity chest = ev.getLevel().getBlockEntity(ev.getPos());
+            ExampleMod.LOGGER.info("Removed chest: " + chest + ", map size: " + chests.size());
+            var isValid = chests.get(chest);
+            isValid.set(false);
+            chests.remove(chest);
+            ExampleMod.LOGGER.info("map size: " + chests.size());
         }
     }
 }

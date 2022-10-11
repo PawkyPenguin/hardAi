@@ -16,6 +16,7 @@ public class CommonModEvents {
     @SubscribeEvent
     public static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(ExampleMod.MY_SKELETON.get(), MySkeleton.createAttributes().build());
+        event.put(ExampleMod.MY_CREEPER.get(), MyCreeper.createAttributes().build());
     }
 
 }
