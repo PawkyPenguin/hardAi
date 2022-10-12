@@ -20,6 +20,7 @@ import net.minecraftforge.event.entity.living.LivingSpawnEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.level.ChunkEvent;
+import net.minecraftforge.event.level.ExplosionEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -135,6 +136,25 @@ public class CommonMCEvents {
             isValid.set(false);
             chests.remove(chest);
             ExampleMod.LOGGER.info("map size: " + chests.size());
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void listenExplosion(ExplosionEvent.Detonate detonation) {
+        ExampleMod.LOGGER.info("Placed block");
+        if (detonation.isCanceled()) {
+            return;
+        }
+        for (var c : detonation.getAffectedBlocks()) {
+            var affectedBlock = detonation.getLevel().getBlockState(c).getBlock();
+            if (MyCreeper.isBlockIWantToDetonate(affectedBlock)) {
+                BlockEntity chest = detonation.getLevel().getBlockEntity(c);
+                ExampleMod.LOGGER.info("Exploded chest: " + chest + ", map size: " + chests.size());
+                var isValid = chests.get(chest);
+                isValid.set(false);
+                chests.remove(chest);
+                ExampleMod.LOGGER.info("map size: " + chests.size());
+            }
         }
     }
 }

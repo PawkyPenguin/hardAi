@@ -3,6 +3,7 @@ package com.example.hardai;
 import net.minecraft.client.model.SkeletonModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.renderer.entity.CreeperRenderer;
 import net.minecraft.client.renderer.entity.SkeletonRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
@@ -20,5 +21,6 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ExampleMod.MY_SKELETON.get(), SkeletonRenderer::new);
+        event.registerEntityRenderer(ExampleMod.MY_CREEPER.get(), CreeperRenderer::new);
     }
 }

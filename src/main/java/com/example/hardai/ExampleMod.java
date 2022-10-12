@@ -72,6 +72,7 @@ public class ExampleMod
     public static final RegistryObject<EntityType<MySkeleton>> MY_SKELETON = ENTITIES.register("my_skeleton", () -> EntityType.Builder.of(MySkeleton::new, MobCategory.MONSTER ).fireImmune().build(new ResourceLocation(MODID, "my_skeleton").toString()));
     public static final RegistryObject<EntityType<MyCreeper>> MY_CREEPER = ENTITIES.register("my_creeper", () -> EntityType.Builder.of(MyCreeper::new, MobCategory.MONSTER ).build(new ResourceLocation(MODID, "my_creeper").toString()));
     public static final RegistryObject<Item> MY_SKELLY_SPAWN_EGG = ITEMS.register("my_skeleton_spawn_egg", () -> new ForgeSpawnEggItem(MY_SKELETON, 0xFF4444, 0x4444FF, new Item.Properties().stacksTo(16).tab(CreativeModeTab.TAB_MISC)));
+    public static final RegistryObject<Item> MY_CREEPER_SPAWN_EGG = ITEMS.register("my_creeper_spawn_egg", () -> new ForgeSpawnEggItem(MY_CREEPER, 0x44FF44, 0x4444FF, new Item.Properties().stacksTo(16).tab(CreativeModeTab.TAB_MISC)));
 
     // Creates a new Block with the id "examplemod:example_block", combining the namespace and path
     public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block", () -> MyBlocks.myBlock());
