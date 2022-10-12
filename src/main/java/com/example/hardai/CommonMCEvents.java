@@ -99,7 +99,7 @@ public class CommonMCEvents {
 
     //public static List<CachedBlockEntity> chests = Collections.synchronizedList(new ArrayList());
     public static final ConcurrentHashMap<BlockEntity, MutableBool> chests = new ConcurrentHashMap();
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void listenChunkLoad(ChunkEvent.Load ev) {
         ExampleMod.LOGGER.info("Loaded chunk");
         var allEntities = ev.getChunk().getBlockEntitiesPos();
@@ -108,6 +108,17 @@ public class CommonMCEvents {
             chests.put(c, new MutableBool(true));
         }
         ExampleMod.LOGGER.info("Done reading chests in chunk");
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void listenChunkLoad(ChunkEvent.Unload ev) {
+        ExampleMod.LOGGER.info("Unloaded chunk");
+        var allEntities = ev.getChunk().getBlockEntitiesPos();
+        var allChests = allEntities.stream().flatMap(pos -> ev.getLevel().getBlockEntity(pos, BlockEntityType.CHEST).stream());
+        for (var c : allChests.toList()) {
+            chests.remove(c);
+        }
+        ExampleMod.LOGGER.info("Done removing chests in chunk");
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

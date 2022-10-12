@@ -16,8 +16,26 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
     private int attackCooldown = -1;
     private int attentionTime;
     private boolean strafingClockwise;
-    private boolean strafingBackwards;
     private int strafingTime = -1;
+    private enum StrafeDirection {FORWARD, BACKWARD, RAND_STRAFE_BACK, RAND_STRAFE_FORWARD;
+        public boolean isLeisureStrafe() {
+            return this == RAND_STRAFE_FORWARD || this == RAND_STRAFE_BACK;
+        }
+
+        public boolean isBackward() {
+            return this == BACKWARD || this == RAND_STRAFE_BACK;
+        }
+
+        public StrafeDirection invertLeisureStrafe() {
+            if (this == StrafeDirection.RAND_STRAFE_FORWARD) {
+                return StrafeDirection.RAND_STRAFE_BACK;
+            } else if (this == StrafeDirection.RAND_STRAFE_BACK) {
+                return StrafeDirection.RAND_STRAFE_FORWARD;
+            }
+            return this;
+        }
+    }
+    private StrafeDirection strafeDirection = StrafeDirection.RAND_STRAFE_FORWARD;
 
     public <M extends Monster & RangedAttackMob> MyRangedAttackGoal(M p_25792_, double p_25793_, int p_25794_, float p_25795_){
         this((T) p_25792_, p_25793_, p_25794_, p_25795_);
@@ -66,9 +84,9 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
     }
 
     public void tick() {
-        LivingEntity livingentity = this.mob.getTarget();
-        if (livingentity != null) {
-            boolean seesTarget = this.mob.getSensing().hasLineOfSight(livingentity);
+        LivingEntity target = this.mob.getTarget();
+        if (target != null) {
+            boolean seesTarget = this.mob.getSensing().hasLineOfSight(target);
             boolean attentionOnTarget = this.attentionTime > 0;
             if (seesTarget != attentionOnTarget) {
                 this.attentionTime = 0;
@@ -80,13 +98,13 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
                 --this.attentionTime;
             }
 
-            double sqrDistanceToTarget = this.mob.distanceToSqr(livingentity.getX(), livingentity.getY(), livingentity.getZ());
+            double sqrDistanceToTarget = this.mob.distanceToSqr(target.position());
             boolean inRange = sqrDistanceToTarget < (double) this.attackRadiusSqr;
             if (inRange && this.attentionTime >= 20) {
                 this.mob.getNavigation().stop();
                 ++this.strafingTime;
             } else {
-                this.mob.getNavigation().moveTo(livingentity, this.speedModifier);
+                this.mob.getNavigation().moveTo(target, this.speedModifier);
                 this.strafingTime = -1;
             }
 
@@ -96,7 +114,7 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
                 }
 
                 if (this.mob.getRandom().nextFloat() < 0.3) {
-                    this.strafingBackwards = !this.strafingBackwards;
+                    strafeDirection = strafeDirection.invertLeisureStrafe();
                 }
 
                 this.strafingTime = 0;
@@ -104,16 +122,26 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
 
             if (this.strafingTime > -1) {
                 boolean nearTarget = sqrDistanceToTarget < (double)(this.attackRadiusSqr * 0.75F);
-                if (nearTarget) {
-                    this.strafingBackwards = true;
-                } else {
-                    this.strafingBackwards = false;
+                boolean tryToEscape = sqrDistanceToTarget < (double)(this.attackRadiusSqr * 0.5F);
+                if (nearTarget && !tryToEscape) {
+                    boolean moveForward = mob.getRandom().nextFloat() < 0.5;
+                    strafeDirection = moveForward ? StrafeDirection.RAND_STRAFE_FORWARD : StrafeDirection.RAND_STRAFE_BACK;
+                } else if (tryToEscape){
+                    strafeDirection = StrafeDirection.BACKWARD;
+                } else { // far away
+                    strafeDirection = StrafeDirection.FORWARD;
                 }
 
-                this.mob.getMoveControl().strafe(this.strafingBackwards ? -0.5F : 0.5F, this.strafingClockwise ? 0.5F : -0.5F);
-                this.mob.lookAt(livingentity, 30.0F, 30.0F);
+                float speed = strafeDirection.isLeisureStrafe() ? 0.5f : 1;
+                float direction = strafeDirection.isBackward() ? -1 : 1;
+                float clockwiseStrafeSpeed = this.strafingClockwise ? 0.5F : -0.5F;
+                if (tryToEscape) {
+                    clockwiseStrafeSpeed = 0;
+                }
+                this.mob.getMoveControl().strafe(speed * direction, clockwiseStrafeSpeed);
+                this.mob.lookAt(target, 30.0F, 30.0F);
             } else {
-                this.mob.getLookControl().setLookAt(livingentity, 30.0F, 30.0F);
+                this.mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
             }
 
             boolean hasLostAttention = this.attentionTime < -60;
@@ -124,9 +152,10 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
                     this.mob.stopUsingItem(); //skelly releases charged bow cuz it's not paying attention
                 } else if (seesTarget) {
                     int i = this.mob.getTicksUsingItem();
-                    if (i >= 20) {
+                    if (i >= 20 && mob.distanceToSqr(target.position()) < attackRadiusSqr * 0.8) {
                         this.mob.stopUsingItem(); // skelly shoots
-                        this.mob.performRangedAttack(livingentity, BowItem.getPowerForTime(i));
+                        this.mob.performRangedAttack(target, BowItem.getPowerForTime(i));
+                        ExampleMod.LOGGER.info("in range and shoot");
                         this.attackCooldown = this.attackIntervalMin;
                     }
                 }

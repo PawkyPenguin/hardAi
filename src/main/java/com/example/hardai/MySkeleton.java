@@ -28,11 +28,12 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 public class MySkeleton extends Skeleton {
-    private static final double RANGE = 100d;
+    private static final double RANGE = 32;
+    private static final double ATTACK_RADIUS = 45;
     private final MyRangedAttackGoal<MySkeleton> bowGoal = makeBowGoal();
     private final MeleeAttackGoal meleeGoal = makeMeleeGoal();
 
-    private MyRangedAttackGoal<MySkeleton> makeBowGoal() {return new MyRangedAttackGoal<MySkeleton>(this, 1.0D, 20, (float) 18);}
+    private MyRangedAttackGoal<MySkeleton> makeBowGoal() {return new MyRangedAttackGoal<MySkeleton>(this, 1.0D, 20, (float) ATTACK_RADIUS);}
 
     private MeleeAttackGoal makeMeleeGoal() {
         return new MeleeAttackGoal(this, 1.2D, false) {
@@ -149,7 +150,7 @@ public class MySkeleton extends Skeleton {
         double x = D * gp.dot(c) + D * b.lengthSqr();
         double w = 2 * D * b.dot(c);
         double v = D * c.lengthSqr() - s;
-        ExampleMod.LOGGER.info("Vars: p2 = " + p2 + ",  p1 = " + p1 + ",  p11 = " + p11+ ", p21 = " + p21+ ", z = " + z + ", y = " + y + ", x = " + x + ", w = " + w + ", v = " + v + ", d = " + d);
+        //ExampleMod.LOGGER.info("Vars: p2 = " + p2 + ",  p1 = " + p1 + ",  p11 = " + p11+ ", p21 = " + p21+ ", z = " + z + ", y = " + y + ", x = " + x + ", w = " + w + ", v = " + v + ", d = " + d);
 
         double slowerSolution = findZero(t0, p2, p1, p11, p21, z, y, x, w, v, d, Optional.empty());
         Optional firstSolution = Optional.of(slowerSolution-0.001);
@@ -172,7 +173,7 @@ public class MySkeleton extends Skeleton {
                 ft_ = (ft_ * (t - firstSolution.get())) / Math.pow(t - firstSolution.get(), 2) - ft / (t - firstSolution.get());
             }
             t = t - ft / ft_;
-            ExampleMod.LOGGER.info("Iteration " + i + ", t = " + t + ", eval " + ft + ", derivative = " + ft_);
+            //ExampleMod.LOGGER.info("Iteration " + i + ", t = " + t + ", eval " + ft + ", derivative = " + ft_);
             ft = eval(t, p2, p1, p11, p21, z, y, x, w, v, d, firstSolution);
             i++;
             if (i > 1000) {
@@ -186,7 +187,6 @@ public class MySkeleton extends Skeleton {
         double dPowT = Math.pow(d, t);
         double result = Math.pow(d, 2*t) * p2 + dPowT * p1 + t*dPowT*p11 + t*t*dPowT*p21 + Math.pow(t, 4)*z
             + Math.pow(t, 3)*y + Math.pow(t, 2)*x + t*w + v;
-        ExampleMod.LOGGER.info("info eval: z-term = :" + Math.pow(t, 4)*z);
         if (firstSolution.isPresent()) {
             result = result / (t - firstSolution.get());
         }
