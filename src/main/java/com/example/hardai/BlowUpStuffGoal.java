@@ -61,7 +61,7 @@ public class BlowUpStuffGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return this.target != null && isTargetValid.get() && canReach(target.getBlockPos());
+        return this.target != null && isTargetValid.get() && canReach();
     }
 
     private void findTarget() {
@@ -77,19 +77,17 @@ public class BlowUpStuffGoal extends Goal {
         }
     }
 
-    private boolean canReach(BlockPos position) {
+    private boolean canReach() {
         if (pathToChest == null) {
             return false;
-        } else {
-            Node node = pathToChest.getEndNode();
-            if (node == null) {
-                return false;
-            } else {
-                int i = node.x - position.getX();
-                int j = node.z - position.getZ();
-                return (double)(i * i + j * j) < DETONATE_RANGE_SQR;
-            }
         }
+        Node node = pathToChest.getEndNode();
+        if (node == null) {
+            return false;
+        }
+        int i = node.x - target.getBlockPos().getX();
+        int j = node.z - target.getBlockPos().getZ();
+        return (double)(i * i + j * j) < DETONATE_RANGE_SQR;
     }
 
     private void updatePath() {

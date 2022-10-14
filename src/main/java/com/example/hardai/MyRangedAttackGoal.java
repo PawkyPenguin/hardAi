@@ -1,6 +1,8 @@
 package com.example.hardai;
 
 import java.util.EnumSet;
+import java.util.Optional;
+
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Monster;
@@ -8,8 +10,8 @@ import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.BowItem;
 
-public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & RangedAttackMob> extends Goal {
-    private final T mob;
+public class MyRangedAttackGoal extends Goal {
+    private final MySkeleton mob;
     private final double speedModifier;
     private int attackIntervalMin;
     private final float attackRadiusSqr;
@@ -17,6 +19,9 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
     private int attentionTime;
     private boolean strafingClockwise;
     private int strafingTime = -1;
+
+    final static private int TICKS_TILL_BOW_CHARGED = 20;
+
     private enum StrafeDirection {FORWARD, BACKWARD, RAND_STRAFE_BACK, RAND_STRAFE_FORWARD;
         public boolean isLeisureStrafe() {
             return this == RAND_STRAFE_FORWARD || this == RAND_STRAFE_BACK;
@@ -37,11 +42,7 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
     }
     private StrafeDirection strafeDirection = StrafeDirection.RAND_STRAFE_FORWARD;
 
-    public <M extends Monster & RangedAttackMob> MyRangedAttackGoal(M p_25792_, double p_25793_, int p_25794_, float p_25795_){
-        this((T) p_25792_, p_25793_, p_25794_, p_25795_);
-    }
-
-    public MyRangedAttackGoal(T p_25792_, double p_25793_, int p_25794_, float attackRadius) {
+    public MyRangedAttackGoal(MySkeleton p_25792_, double p_25793_, int p_25794_, float attackRadius) {
         this.mob = p_25792_;
         this.speedModifier = p_25793_;
         this.attackIntervalMin = p_25794_;
@@ -98,12 +99,30 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
                 --this.attentionTime;
             }
 
+            boolean shotAtTarget = false;
+            if (this.mob.isUsingItem() && mob.distanceToSqr(target.position()) < attackRadiusSqr * 0.8) {
+                int i = this.mob.getTicksUsingItem();
+                if (i >= TICKS_TILL_BOW_CHARGED && mob.isTargetFreeFromKnockback()) {
+                    ExampleMod.LOGGER.info("in range, finding shot");
+                    var possibleShot = mob.tryToFindShot(target);
+                    shotAtTarget = possibleShot.isPresent();
+                    possibleShot.ifPresent(shot -> {
+                        this.mob.stopUsingItem(); // skelly shoots
+                        this.mob.performRangedAttack(BowItem.getPowerForTime(i), shot);
+                        ExampleMod.LOGGER.info("in range and shoot");
+                        this.attackCooldown = this.attackIntervalMin;
+                    });
+                }
+            } else if (attackCooldown <= 0) {
+                this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof BowItem));
+            }
+
             double sqrDistanceToTarget = this.mob.distanceToSqr(target.position());
             boolean inRange = sqrDistanceToTarget < (double) this.attackRadiusSqr;
-            if (inRange && this.attentionTime >= 20) {
+            if (shotAtTarget || (inRange && this.attentionTime >= 20)) {
                 this.mob.getNavigation().stop();
                 ++this.strafingTime;
-            } else {
+            } else if (!shotAtTarget) {
                 this.mob.getNavigation().moveTo(target, this.speedModifier);
                 this.strafingTime = -1;
             }
@@ -138,30 +157,14 @@ public class MyRangedAttackGoal<T extends net.minecraft.world.entity.Mob & Range
                 if (tryToEscape) {
                     clockwiseStrafeSpeed = 0;
                 }
-                this.mob.getMoveControl().strafe(speed * direction, clockwiseStrafeSpeed);
+                //this.mob.getMoveControl().strafe(speed * direction, clockwiseStrafeSpeed);
+                this.mob.getMoveControl().strafe(speed * direction, 0);
                 this.mob.lookAt(target, 30.0F, 30.0F);
             } else {
                 this.mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
             }
 
-            boolean hasLostAttention = this.attentionTime < -60;
-            hasLostAttention = false;
             attackCooldown--;
-            if (this.mob.isUsingItem()) {
-                if (!seesTarget && hasLostAttention) {
-                    this.mob.stopUsingItem(); //skelly releases charged bow cuz it's not paying attention
-                } else if (seesTarget) {
-                    int i = this.mob.getTicksUsingItem();
-                    if (i >= 20 && mob.distanceToSqr(target.position()) < attackRadiusSqr * 0.8) {
-                        this.mob.stopUsingItem(); // skelly shoots
-                        this.mob.performRangedAttack(target, BowItem.getPowerForTime(i));
-                        ExampleMod.LOGGER.info("in range and shoot");
-                        this.attackCooldown = this.attackIntervalMin;
-                    }
-                }
-            } else if (attackCooldown <= 0 && !hasLostAttention) {
-                this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof BowItem));
-            }
 
         }
     }

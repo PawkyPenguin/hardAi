@@ -19,6 +19,7 @@ public class MyAttackableTargetGoal<T extends LivingEntity> extends NearestAttac
     public MyAttackableTargetGoal(Mob attacker, Class<T> targetType, int p_26055_, boolean mustSee, boolean mustReachToTrack, @Nullable Predicate<LivingEntity> p_26058_) {
         super(attacker, targetType, p_26055_, mustSee, mustReachToTrack, p_26058_);
         this.myTargetConditions = MyTargetingConditions.forCombat().range(this.getFollowDistance()).selector(p_26058_);
+        this.unseenMemoryTicks = 400; // make high
     }
 
     public boolean canUse() {

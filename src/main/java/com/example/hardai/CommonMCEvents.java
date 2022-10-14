@@ -27,10 +27,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -58,36 +55,41 @@ public class CommonMCEvents {
     public static Vec3 playerPosBefore;
     public static Vec3 playerPosAfter;
     public static boolean playerPosValid;
+    public static int sinceOnGroundTimestamp = 0;
 
     @SubscribeEvent
     public static void listenMovement(TickEvent.PlayerTickEvent p) {
-        //ExampleMod.LOGGER.info("Player");
-        //ExampleMod.LOGGER.info(p.phase.toString());
-        //ExampleMod.LOGGER.info(p.player.position().toString());
+        //if (p.player.hurtMarked && p.phase == TickEvent.Phase.END) {
+        //    speedInvalidForTicksNum = 20;
+        //    playerPosValid = false;
+        //    return;
+        //}
+        //if (speedInvalidForTicksNum > 0) {
+        //    if (p.phase == TickEvent.Phase.END && p.player.getDeltaMovement().equals(Vec3.ZERO)) {
+        //        speedInvalidForTicksNum = 0;
+        //    } else if (p.phase == TickEvent.Phase.END) {
+        //        speedInvalidForTicksNum--;
+        //    }
+        //    ExampleMod.LOGGER.info("invalid pos");
+        //    return;
+        //} else {
+        //    playerPosValid = true;
+        //}
+        if (p.phase == TickEvent.Phase.END) {
+            if (!p.player.isOnGround()) {
+                sinceOnGroundTimestamp = -1;
+            }
+            if (p.player.isOnGround() && sinceOnGroundTimestamp == -1) {
+                sinceOnGroundTimestamp = p.player.tickCount;
+            }
+            //ExampleMod.LOGGER.info("since ground: " + sinceOnGroundTimestamp);
+            //ExampleMod.LOGGER.info("tick count: " + p.player.tickCount);
+        }
+
         if (p.phase == TickEvent.Phase.START) {
             playerPosBefore = p.player.position();
-            playerPosValid = false;
         } else {
             playerPosAfter = p.player.position();
-            playerPosValid = true;
-
-        }
-    }
-
-    public static class CachedBlockEntity {
-        BlockEntity wrapper;
-        private boolean isValid = true;
-
-        CachedBlockEntity(BlockEntity toCache) {
-            wrapper = toCache;
-        }
-
-        public boolean isValid() {
-            return isValid;
-        }
-
-        public void invalidate() {
-            isValid = false;
         }
     }
 
@@ -101,24 +103,27 @@ public class CommonMCEvents {
     public static final ConcurrentHashMap<BlockEntity, MutableBool> chests = new ConcurrentHashMap();
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void listenChunkLoad(ChunkEvent.Load ev) {
-        ExampleMod.LOGGER.info("Loaded chunk");
+        //ExampleMod.LOGGER.info("Loaded chunk");
         var allEntities = ev.getChunk().getBlockEntitiesPos();
-        var allChests = allEntities.stream().flatMap(pos -> ev.getLevel().getBlockEntity(pos, BlockEntityType.CHEST).stream());
-        for (var c : allChests.toList()) {
-            chests.put(c, new MutableBool(true));
-        }
-        ExampleMod.LOGGER.info("Done reading chests in chunk");
+        allEntities.stream().forEach(blockPos -> {
+            var maybeChest = ev.getChunk().getBlockEntity(blockPos, BlockEntityType.CHEST);
+            maybeChest.ifPresent(chest -> {
+                MutableBool t = new MutableBool(true);
+                chests.putIfAbsent(chest, t);
+            });
+        });
+        //ExampleMod.LOGGER.info("Done reading chests in chunk");
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void listenChunkLoad(ChunkEvent.Unload ev) {
-        ExampleMod.LOGGER.info("Unloaded chunk");
+    public static void listenChunkUnload(ChunkEvent.Unload ev) {
+        //ExampleMod.LOGGER.info("Unloaded chunk");
         var allEntities = ev.getChunk().getBlockEntitiesPos();
         var allChests = allEntities.stream().flatMap(pos -> ev.getLevel().getBlockEntity(pos, BlockEntityType.CHEST).stream());
         for (var c : allChests.toList()) {
             chests.remove(c);
         }
-        ExampleMod.LOGGER.info("Done removing chests in chunk");
+        //ExampleMod.LOGGER.info("Done removing chests in chunk");
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -130,13 +135,14 @@ public class CommonMCEvents {
         if (ev.getPlacedBlock().getBlock() == Blocks.CHEST) {
             BlockEntity chest = ev.getLevel().getBlockEntity(ev.getPos());
             ExampleMod.LOGGER.info("Placed chest: " + chest);
-            chests.put(chest, new MutableBool(true));
+            MutableBool t = new MutableBool(true);
+            chests.put(chest, t);
         }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void listenBlockRemove(BlockEvent.BreakEvent ev) {
-        ExampleMod.LOGGER.info("Placed block");
+        ExampleMod.LOGGER.info("Breaking block");
         if (ev.isCanceled()) {
             return;
         }
@@ -152,7 +158,7 @@ public class CommonMCEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void listenExplosion(ExplosionEvent.Detonate detonation) {
-        ExampleMod.LOGGER.info("Placed block");
+        ExampleMod.LOGGER.info("Exploding block");
         if (detonation.isCanceled()) {
             return;
         }
